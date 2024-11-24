@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Juego</title>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: url('https://static.vecteezy.com/system/resources/previews/009/877/699/non_2x/pixel-art-night-sky-background-with-clouds-and-stars-for-game-8-bit-vector.jpg') no-repeat center center fixed;
+            background-size: cover;
+            overflow: hidden;
+        }
+        #square {
+            width: 100px;
+            height: 100px;
+            background: url('https://static.vecteezy.com/system/resources/thumbnails/035/982/442/small/ai-generated-3d-flying-rocket-isolated-on-transparent-background-free-png.png') no-repeat center center;
+            background-size: contain;
+            position: absolute;
+            left: 200px;
+            top: calc(50% - 100px);
+            transform: translateY(-50%);
+            display: none;
+        }
+        .enemy {
+            position: absolute;
+            right: 0;
+            animation: moveLeft 3s linear infinite;
+        }
+        .enemy.red {
+            width: 90px;
+            height: 90px;
+            background: url('https://images.vexels.com/media/users/3/203033/isolated/preview/bad8b13b449cf80e9cdbf1c355d63f4f-ilustracion-de-gran-asteroide.png') no-repeat center center;
+            background-size: contain;
+        }
+        .enemy.blue {
+            width: 150px;
+            height: 150px;
+            background: url('https://static.vecteezy.com/system/resources/thumbnails/032/424/279/small_2x/saturn-space-planet-ai-generative-free-png.png') no-repeat center center;
+            background-size: contain;
+        }
+        .enemy.green {
+            width: 50px;
+            height: 50px;
+            background: url('https://static.vecteezy.com/system/resources/previews/009/342/338/non_2x/thunderbolt-clipart-design-illustration-free-png.png') no-repeat center center;
+            background-size: contain;
+        }
+        #marker {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background-color: rgba(0, 0, 0, 0.5);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            font-size: 1.5em;
+            display: none;
+        }
+        #startButton {
+            position: absolute;
+            padding: 15px 30px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 1.5em;
+            cursor: pointer;
+        }
+        #startButton:hover {
+            background-color: #45a049;
+        }
+        @keyframes moveLeft {
+            0% {
+                right: -10%;
+            }
+            100% {
+                right: 110%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="marker">
+        <div>Tiempo: <span id="time">0</span>s</div>
+        <div>Vidas: <span id="lives">3</span></div>
+        <div>Rayos: <span id="rays">0</span></div>
+    </div>
+    <button id="startButton">Iniciar Juego</button>
+    <div id="square"></div>
+    <audio id="gameMusic" src="Musica.mp3"></audio>
+    <script>
+        let enemyPositions = [];
+        let time = 0;
+        let lives = 3;
+        let rays = 0;
+        let enemyInterval;
+        let timeInterval;
+        let collisionInterval;
+
+        const maxEnemies = 10; // Límite de enemigos activos
+        const marker = document.getElementById('marker');
+        const square = document.getElementById('square');
+        const startButton = document.getElementById('startButton');
+
+        function updateMarker() {
+            document.getElementById('time').textContent = time;
+            document.getElementById('lives').textContent = lives;
+            document.getElementById('rays').textContent = rays;
+        }
+
+        function createEnemy() {
+            if (document.querySelectorAll('.enemy').length >= maxEnemies) return;
+        
+            const enemy = document.createElement('div');
+            enemy.classList.add('enemy');
+            const colors = ['red', 'blue', 'green'];
+            const color = colors[Math.floor(Math.random() * colors.length)];
+            enemy.classList.add(color);
+        
+            // Generar una posición aleatoria que no se solape con otras
+            let top;
+            let attempts = 0; // Evitar bucles infinitos
+            do {
+                top = Math.random() * (window.innerHeight - 150) + 50;
+                attempts++;
+                if (attempts > 20) break; // Si falla, fuerza una posición
+            } while (enemyPositions.some(pos => Math.abs(pos - top) < 150)); // Aumenta el umbral para evitar solapamiento
+        
+            enemy.style.top = top + 'px';
+            enemyPositions.push(top);
+        
+            document.body.appendChild(enemy);
+        
+            // Ajustar velocidad para cada enemigo
+            enemy.style.animationDuration = `${2 + Math.random() * 3}s`; // Aumenta el rango para más diversidad
+        
+            // Eliminar enemigos después de la animación
+            enemy.addEventListener('animationend', () => {
+                enemy.remove();
+                enemyPositions = enemyPositions.filter(pos => pos !== top);
+            });
+        }
+        
+        function detectCollision() {
+            const squareRect = square.getBoundingClientRect();
+
+            document.querySelectorAll('.enemy').forEach(enemy => {
+                const enemyRect = enemy.getBoundingClientRect();
+
+                if (
+                    squareRect.left < enemyRect.right &&
+                    squareRect.right > enemyRect.left &&
+                    squareRect.top < enemyRect.bottom &&
+                    squareRect.bottom > enemyRect.top
+                ) {
+                    if (enemy.classList.contains('green')) {
+                        rays++;
+                    } else {
+                        lives--;
+                    }
+
+                    enemy.remove();
+                    enemyPositions = enemyPositions.filter(pos => pos !== parseInt(enemy.style.top));
+                    updateMarker();
+
+                    if (lives <= 0) {
+                        endGame();
+                    }
+                }
+            });
+        }
+
+        function startGame() {
+            time = 0;
+            lives = 3;
+            rays = 0;
+            enemyPositions = [];
+            updateMarker();
+
+            marker.style.display = 'block';
+            square.style.display = 'block';
+            startButton.style.display = 'none';
+
+            enemyInterval = setInterval(createEnemy, 1000 + Math.random() * 1000); // Aleatorizar intervalos
+            timeInterval = setInterval(() => {
+                time++;
+                updateMarker();
+            }, 1000);
+            collisionInterval = setInterval(detectCollision, 50);
+
+            const gameMusic = document.getElementById('gameMusic');
+            gameMusic.play();
+        }
+
+        function endGame() {
+            alert('Game Over');
+            clearInterval(enemyInterval);
+            clearInterval(timeInterval);
+            clearInterval(collisionInterval);
+
+            document.querySelectorAll('.enemy').forEach(enemy => enemy.remove());
+            enemyPositions = [];
+
+            marker.style.display = 'none';
+            square.style.display = 'none';
+            startButton.style.display = 'block';
+        }
+
+        startButton.addEventListener('click', startGame);
+
+        document.addEventListener('keydown', function (event) {
+            const step = 20;
+            const squareHeight = square.offsetHeight;
+            const windowHeight = window.innerHeight;
+
+            let top = parseInt(window.getComputedStyle(square).top);
+
+            if (event.key === 'w' && top > 50) {
+                square.style.top = (top - step) + 'px';
+            } else if (event.key === 's' && top < windowHeight - squareHeight) {
+                square.style.top = (top + step) + 'px';
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', (event) => {
+            const rocket = document.getElementById('rocket');
+            const step = 10; // Pixels to move per step
+            const minY = 0; // Minimum Y position (top limit)
+            const maxY = window.innerHeight - rocket.offsetHeight; // Maximum Y position (bottom limit)
+
+            document.addEventListener('keydown', (e) => {
+                let top = parseInt(window.getComputedStyle(rocket).top);
+
+                if (e.key === 'ArrowUp') {
+                    if (top > minY) {
+                        rocket.style.top = `${top - step}px`;
+                    }
+                } else if (e.key === 'ArrowDown') {
+                    if (top < maxY) {
+                        rocket.style.top = `${top + step}px`;
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>
